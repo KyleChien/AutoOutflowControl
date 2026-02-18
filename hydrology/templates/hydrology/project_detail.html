@@ -1,0 +1,181 @@
+{% extends 'hydrology/base.html' %}
+
+{% block title %}{{ project.name }} - FishPeak Flow{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-folder me-2"></i>{{ project.name }}</h1>
+    <div>
+        <a href="{% url 'hydrology:project_compute' project.id %}" class="btn btn-success me-2">
+            <i class="fas fa-calculator me-1"></i>Run Computation
+        </a>
+        <a href="{% url 'hydrology:project_edit' project.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-edit me-1"></i>Edit
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Project Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Name:</strong> {{ project.name }}</p>
+                <p><strong>Description:</strong> {{ project.description|default:"No description provided" }}</p>
+                <p><strong>Created:</strong> {{ project.created_at|date:"F d, Y H:i" }}</p>
+                <p><strong>Updated:</strong> {{ project.updated_at|date:"F d, Y H:i" }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configuration Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <i class="fas fa-chart-line me-2"></i>Horner Coefficients:
+                    {% if horner_coefficients %}
+                        <span class="badge bg-success">{{ horner_coefficients|length }} sets</span>
+                    {% else %}
+                        <span class="badge bg-danger">Not configured</span>
+                    {% endif %}
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-mountain me-2"></i>Watershed Parameters:
+                    {% if watershed_params %}
+                        <span class="badge bg-success">Configured</span>
+                    {% else %}
+                        <span class="badge bg-danger">Not configured</span>
+                    {% endif %}
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-cloud-rain me-2"></i>Rainfall Parameters:
+                    {% if rainfall_params %}
+                        <span class="badge bg-success">Configured</span>
+                    {% else %}
+                        <span class="badge bg-danger">Not configured</span>
+                    {% endif %}
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-chart-area me-2"></i>Unit Hydrograph:
+                    {% if unit_hydrograph_data %}
+                        <span class="badge bg-success">Configured</span>
+                    {% else %}
+                        <span class="badge bg-danger">Not configured</span>
+                    {% endif %}
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-calculator me-2"></i>Results:
+                    {% if computation_results %}
+                        <span class="badge bg-success">Available</span>
+                    {% else %}
+                        <span class="badge bg-warning">Not computed</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if horner_coefficients %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Horner Coefficients</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Return Period (years)</th>
+                        <th>Coefficient a</th>
+                        <th>Coefficient b</th>
+                        <th>Coefficient c</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for coeff in horner_coefficients %}
+                    <tr>
+                        <td>{{ coeff.return_period }}</td>
+                        <td>{{ coeff.coefficient_a }}</td>
+                        <td>{{ coeff.coefficient_b }}</td>
+                        <td>{{ coeff.coefficient_c }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if watershed_params %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-mountain me-2"></i>Watershed Parameters</h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <p><strong>Tc Calculation Method:</strong> 
+                {% if watershed_params.tc_calculation_method == 'computed' %}
+                    <span class="badge bg-info">Computed from parameters</span>
+                {% else %}
+                    <span class="badge bg-warning">Input directly</span>
+                {% endif %}
+            </p>
+        </div>
+        
+        {% if watershed_params.tc_calculation_method == 'computed' %}
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Flow Path Length (L):</strong> {{ watershed_params.length }} m</p>
+                    <p><strong>Elevation Difference (H):</strong> {{ watershed_params.elevation_diff }} m</p>
+                    <p><strong>Manning's n:</strong> {{ watershed_params.manning_n }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Hydraulic Radius (R):</strong> {{ watershed_params.hydraulic_radius }} m</p>
+                    <p><strong>Watershed Area (A):</strong> {{ watershed_params.area }} km²</p>
+                </div>
+            </div>
+        {% else %}
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Time of Concentration (Tc):</strong> {{ watershed_params.time_concentration|floatformat:3 }} hours</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Watershed Area (A):</strong> {{ watershed_params.area }} km²</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if rainfall_params %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-cloud-rain me-2"></i>Rainfall Parameters</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Curve Number (CN):</strong> {{ rainfall_params.curve_number }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Unit Duration (tr):</strong> {{ rainfall_params.unit_duration }} hours</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-4">
+    <a href="{% url 'hydrology:project_list' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-1"></i>Back to Projects
+    </a>
+</div>
+{% endblock %}

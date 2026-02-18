@@ -1,0 +1,258 @@
+{% extends 'hydrology/base.html' %}
+
+{% block title %}Create Project - FishPeak Flow{% endblock %}
+
+{% block content %}
+<h1><i class="fas fa-plus me-2"></i>Create New Project</h1>
+
+<form method="post">
+    {% csrf_token %}
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Project Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="{{ form.name.id_for_label }}" class="form-label">Project Name *</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="text-danger">{{ form.name.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">Enter a descriptive name for your hydrology project</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="text-danger">{{ form.description.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">Optional description of the project purpose or location</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Horner Coefficients</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Enter Horner coefficients (a, b, c) for each return period. These coefficients define the intensity-duration-frequency relationship for rainfall.</p>
+                    
+                    <div class="table-responsive">
+                        <table class="table" id="hornerTable">
+                            <thead>
+                                <tr>
+                                    <th>Return Period (years)</th>
+                                    <th>Coefficient a</th>
+                                    <th>Coefficient b</th>
+                                    <th>Coefficient c</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><input type="number" name="return_period_0" value="2" class="form-control" readonly></td>
+                                    <td><input type="number" name="coefficient_a_0" value="1666.842" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_b_0" value="23.246" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_c_0" value="0.731" step="0.001" class="form-control"></td>
+                                </tr>
+                                <tr>
+                                    <td><input type="number" name="return_period_1" value="5" class="form-control" readonly></td>
+                                    <td><input type="number" name="coefficient_a_1" value="1914.351" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_b_1" value="34.037" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_c_1" value="0.694" step="0.001" class="form-control"></td>
+                                </tr>
+                                <tr>
+                                    <td><input type="number" name="return_period_2" value="10" class="form-control" readonly></td>
+                                    <td><input type="number" name="coefficient_a_2" value="2052.866" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_b_2" value="40.099" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_c_2" value="0.69" step="0.001" class="form-control"></td>
+                                </tr>
+                                <tr>
+                                    <td><input type="number" name="return_period_3" value="25" class="form-control" readonly></td>
+                                    <td><input type="number" name="coefficient_a_3" value="2184.709" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_b_3" value="44.84" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_c_3" value="0.693" step="0.001" class="form-control"></td>
+                                </tr>
+                                <tr>
+                                    <td><input type="number" name="return_period_4" value="50" class="form-control" readonly></td>
+                                    <td><input type="number" name="coefficient_a_4" value="2228.156" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_b_4" value="45.631" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_c_4" value="0.694" step="0.001" class="form-control"></td>
+                                </tr>
+                                <tr>
+                                    <td><input type="number" name="return_period_5" value="100" class="form-control" readonly></td>
+                                    <td><input type="number" name="coefficient_a_5" value="2232.124" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_b_5" value="44.432" step="0.001" class="form-control"></td>
+                                    <td><input type="number" name="coefficient_c_5" value="0.694" step="0.001" class="form-control"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-mountain me-2"></i>Watershed Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="tc_calculation_method" class="form-label">Time of Concentration Method</label>
+                        <select name="tc_calculation_method" id="tc_calculation_method" class="form-control">
+                            <option value="computed">Compute from watershed parameters</option>
+                            <option value="direct">Input directly</option>
+                        </select>
+                        <div class="form-text">Choose how to determine the time of concentration (Tc)</div>
+                    </div>
+                    
+                    <!-- Computed Method Fields -->
+                    <div id="computed-fields" class="computed-section">
+                        <h6 class="text-muted mb-3">Watershed Parameters for Tc Calculation</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Flow Path Length (L) (meters)</label>
+                                    <input type="number" name="length" value="1000" step="0.1" class="form-control" id="length">
+                                    <div class="form-text">Length of the flow path in meters</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Elevation Difference (H) (meters)</label>
+                                    <input type="number" name="elevation_diff" value="50" step="0.1" class="form-control" id="elevation_diff">
+                                    <div class="form-text">Elevation difference in meters</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Manning's Roughness (n)</label>
+                                    <input type="number" name="manning_n" value="0.035" step="0.001" class="form-control" id="manning_n">
+                                    <div class="form-text">Manning's roughness coefficient (typically 0.025-0.05)</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Hydraulic Radius (R) (meters)</label>
+                                    <input type="number" name="hydraulic_radius" value="2.0" step="0.001" class="form-control" id="hydraulic_radius">
+                                    <div class="form-text">Hydraulic radius in meters</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Direct Method Fields -->
+                    <div id="direct-fields" class="direct-section" style="display: none;">
+                        <h6 class="text-muted mb-3">Direct Time of Concentration Input</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Time of Concentration (Tc) (hours)</label>
+                                    <input type="number" name="time_concentration" value="0.5" step="0.001" class="form-control" id="time_concentration">
+                                    <div class="form-text">Direct input of time concentration in hours</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Common Fields -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Watershed Area (A) (km²)</label>
+                                <input type="number" name="area" value="0.037" step="0.001" class="form-control" id="area" required>
+                                <div class="form-text">Watershed area in square kilometers</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cloud-rain me-2"></i>Rainfall Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Curve Number (CN)</label>
+                                <input type="number" name="curve_number" value="75" min="0" max="100" class="form-control" required>
+                                <div class="form-text">SCS Curve Number (0-100). Typical values: 30-98</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Unit Duration (tr) (hours)</label>
+                                <input type="number" name="unit_duration" value="0.5" step="0.1" class="form-control" required>
+                                <div class="form-text">Unit precipitation duration in hours</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>Help</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Horner Coefficients</h6>
+                    <p class="small">These coefficients define the rainfall intensity-duration-frequency relationship for your location. The values provided are typical for urban drainage design.</p>
+                    
+                    <h6>Watershed Parameters</h6>
+                    <p class="small">Physical characteristics of your watershed that affect flow timing and rates.</p>
+                    
+                    <h6>Curve Number</h6>
+                    <p class="small">Determines runoff potential based on soil type and land cover:</p>
+                    <ul class="small">
+                        <li>30-40: High infiltration (sandy soil, forest)</li>
+                        <li>50-70: Moderate infiltration (mixed land use)</li>
+                        <li>80-98: Low infiltration (urban areas, clay soil)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save me-1"></i>Create Project
+                    </button>
+                    <a href="{% url 'hydrology:project_list' %}" class="btn btn-secondary w-100 mt-2">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const methodSelect = document.getElementById('tc_calculation_method');
+    const computedFields = document.getElementById('computed-fields');
+    const directFields = document.getElementById('direct-fields');
+    const computedInputs = computedFields.querySelectorAll('input:not([id="area"])');
+    
+    function updateFieldVisibility() {
+        if (methodSelect.value === 'computed') {
+            computedFields.style.display = 'block';
+            directFields.style.display = 'none';
+            // Make computed fields required
+            computedInputs.forEach(input => input.setAttribute('required', 'required'));
+            document.getElementById('time_concentration').removeAttribute('required');
+        } else {
+            computedFields.style.display = 'none';
+            directFields.style.display = 'block';
+            // Make direct field required
+            computedInputs.forEach(input => input.removeAttribute('required'));
+            document.getElementById('time_concentration').setAttribute('required', 'required');
+        }
+    }
+    
+    methodSelect.addEventListener('change', updateFieldVisibility);
+    updateFieldVisibility(); // Set initial state
+});
+</script>
+{% endblock %}

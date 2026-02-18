@@ -1,0 +1,388 @@
+{% extends 'hydrology/base.html' %}
+
+{% block title %}Results - {{ project.name }} - FishPeak Flow{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-chart-line me-2"></i>Computation Results</h1>
+    <div>
+        <a href="{% url 'hydrology:export_results' project.id 'csv' %}" class="btn btn-outline-success me-2">
+            <i class="fas fa-file-csv me-1"></i>Export CSV
+        </a>
+        <a href="{% url 'hydrology:export_results' project.id 'json' %}" class="btn btn-outline-primary me-2">
+            <i class="fas fa-file-code me-1"></i>Export JSON
+        </a>
+        <a href="{% url 'hydrology:project_detail' project.id %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Project
+        </a>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    Computed on: {{ results.computed_at|date:"F d, Y H:i" }} | 
+    Time of Concentration: {{ results.time_concentration|floatformat:3 }} hours
+</div>
+
+<!-- Intensity and Accumulation Tables -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cloud-rain me-2"></i>Precipitation Intensity (mm/hr)</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Return Period</th>
+                                <th>Duration</th>
+                                <th>Intensity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for period, period_data in intensity_table.items %}
+                                {% for duration, intensity in period_data.items %}
+                                    <tr>
+                                        <td>{{ period }} years</td>
+                                        <td>{{ duration }} min</td>
+                                        <td>{{ intensity|floatformat:2 }}</td>
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-water me-2"></i>Accumulated Precipitation (mm)</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Return Period</th>
+                                <th>Duration</th>
+                                <th>Accumulation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for period, period_data in accumulation_table.items %}
+                                {% for duration, accumulation in period_data.items %}
+                                    <tr>
+                                        <td>{{ period }} years</td>
+                                        <td>{{ duration }} min</td>
+                                        <td>{{ accumulation|floatformat:1 }}</td>
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Hyetograph</h5>
+            </div>
+            <div class="card-body" style="height: 400px;">
+                <canvas id="hyetographChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>Effective Rainfall</h5>
+            </div>
+            <div class="card-body" style="height: 400px;">
+                <canvas id="effectiveRainfallChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unit Hydrograph and Outflow Hydrograph -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Unit Hydrograph</h5>
+            </div>
+            <div class="card-body" style="height: 400px;">
+                <canvas id="unitHydrographChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>Outflow Hydrograph</h5>
+            </div>
+            <div class="card-body" style="height: 400px;">
+                <canvas id="outflowHydrographChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js is not loaded');
+        return;
+    }
+    
+    // Convert Django template data to JavaScript
+    const hyetographData = {{ hyetograph|safe }};
+    const effectiveRainfallData = {{ effective_rainfall|safe }};
+    const unitHydrographData = {{ unit_hydrograph|safe }};
+    const outflowHydrographData = {{ outflow_hydrograph|safe }};
+
+// Helper function to create chart with error handling
+function createChart(canvasId, config) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.error(`Canvas with id '${canvasId}' not found`);
+        return null;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        console.error(`Could not get 2D context for canvas '${canvasId}'`);
+        return null;
+    }
+    
+    try {
+        return new Chart(ctx, config);
+    } catch (error) {
+        console.error(`Error creating chart '${canvasId}':`, error);
+        return null;
+    }
+}
+
+// Hyetograph Chart
+const hyetographChart = createChart('hyetographChart', {
+    type: 'bar',
+    data: {
+        labels: Array.from({length: hyetographData.length}, (_, i) => `t${i}`),
+        datasets: [{
+            label: 'Hyetograph (mm)',
+            data: hyetographData,
+            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Precipitation (mm)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Time Unit'
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                borderColor: '#ddd',
+                borderWidth: 1
+            }
+        }
+    }
+});
+
+// Effective Rainfall Chart
+const effectiveRainfallChart = createChart('effectiveRainfallChart', {
+    type: 'bar',
+    data: {
+        labels: Array.from({length: effectiveRainfallData.length}, (_, i) => `t${i}`),
+        datasets: [{
+            label: 'Effective Rainfall (mm)',
+            data: effectiveRainfallData,
+            backgroundColor: 'rgba(75, 192, 192, 0.8)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Effective Rainfall (mm)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Time Unit'
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                borderColor: '#ddd',
+                borderWidth: 1
+            }
+        }
+    }
+});
+
+// Unit Hydrograph Chart
+const unitHydrographChart = createChart('unitHydrographChart', {
+    type: 'line',
+    data: {
+        labels: unitHydrographData.time.map(t => t.toFixed(2)),
+        datasets: [{
+            label: 'Unit Hydrograph (cms)',
+            data: unitHydrographData.discharge,
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            fill: true,
+            tension: 0.1,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Discharge (cms)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Time (hours)'
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                borderColor: '#ddd',
+                borderWidth: 1
+            }
+        }
+    }
+});
+
+// Outflow Hydrograph Chart
+const unitDuration = {{ rainfall_params.unit_duration|default:1 }};
+const outflowHydrographChart = createChart('outflowHydrographChart', {
+    type: 'line',
+    data: {
+        labels: Array.from({length: outflowHydrographData.length}, (_, i) => (i * unitDuration).toFixed(2)),
+        datasets: [{
+            label: 'Outflow Hydrograph (cms)',
+            data: outflowHydrographData,
+            borderColor: 'rgba(153, 102, 255, 1)',
+            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+            fill: true,
+            tension: 0.1,
+            pointRadius: 3,
+            pointHoverRadius: 5
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Discharge (cms)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Time (hours)'
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                borderColor: '#ddd',
+                borderWidth: 1
+            }
+        }
+    }
+});
+});
+</script>
+{% endblock %}
